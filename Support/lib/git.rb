@@ -77,7 +77,11 @@ module SCM
     
     # The absolute path to working copy
     def path
-      @path ||= File.expand_path('..', git_dir(paths.first))
+      @path ||= %x{
+        cd #{e_sh dir_part(paths.first)}
+        #{git} rev-parse --show-toplevel;
+        cd - > /dev/null;
+      }.chomp
     end
     
     def root
@@ -132,7 +136,7 @@ module SCM
       end
     end
 
-    def git_dir(file_or_dir)
+    def git_dir(file_or_dir = paths.first)
       file = %x{
         cd #{e_sh dir_part(file_or_dir)}
         #{git} rev-parse --git-dir;
@@ -201,11 +205,11 @@ module SCM
     end
     
     def initial_commit_pending?
-      /^# Initial commit$/.match(command("status")) ? true : false
+      /^(# )?Initial commit$/.match(command("status")) ? true : false
     end
     
     def status(file_or_dir = nil, options = {})
-      results = parse_status(command("status"))
+      results = parse_status(command("status", "--porcelain"))
       return results if file_or_dir.nil?
       results.select do |status|
         Array(file_or_dir).find { |e| status[:path] =~ /^#{Regexp.escape(e)}(\/|$)/ }
